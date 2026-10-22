@@ -176,6 +176,50 @@ struct MiniCPM5ToolCallTests {
         #expect(empty.function.arguments.isEmpty)
     }
 
+    @Test("Python-spelled values the template renders are typed by the schema")
+    func pythonSpelledValues() throws {
+        // The template writes `{{ param_value }}`, i.e. Python's repr of a list or dict, and
+        // `True` for a boolean (stored raw outputs of the engine run, cases list-01, object-02).
+        let call = try #require(
+            MiniCPM5ToolCallParser().parse(
+                content: """
+                    <function name="echo_args"><param name="items">['age', 'computer', 'issue']</param>\
+                    <param name="nested">{'unit': 'a', 'depth': 2}</param>\
+                    <param name="flag">False</param></function>
+                    """, tools: Self.tools))
+        #expect(
+            call.function.arguments == [
+                "items": .array([.string("age"), .string("computer"), .string("issue")]),
+                "nested": .object(["unit": .string("a"), "depth": .int(2)]),
+                "flag": .bool(false),
+            ])
+    }
+
+    @Test("An end-of-stream buffer yields the complete calls and never the unfinished one")
+    func endOfStreamBuffer() {
+        let calls = MiniCPM5ToolCallParser().parseEOS(
+            """
+            <function name="get_weather"><param name="city">Havana</param></function>
+            <function name="get_time"></function>
+            <function name="get_weather"><param name="city">Dub
+            """, tools: Self.tools)
+        #expect(calls.map(\.function.name) == ["get_weather", "get_time"])
+    }
+
+    @Test("A self-closing function element is not a call; the frame ends at the next close tag")
+    func selfClosingFunction() {
+        #expect(
+            MiniCPM5ToolCallParser().parse(
+                content: #"<function name="get_time"/>"#, tools: Self.tools) == nil)
+        // It is read as malformed and rejected at the next `</function>`, not held to the
+        // end of the stream.
+        let result = run(
+            #"<function name="get_time"/>text<function name="get_time"></function>after"#, size: 5)
+        #expect(result.calls.isEmpty)
+        #expect(result.rejected.count == 1)
+        #expect(result.response == "after")
+    }
+
     @Test(
         "A payload that is not canonical is never a call",
         arguments: [

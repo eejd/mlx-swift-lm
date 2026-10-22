@@ -109,10 +109,9 @@ enum MiniCPM5PayloadScanner {
         case .malformed: return .malformed
         }
         index = function.end
-        guard !function.name.isEmpty else { return .malformed }
-        guard !function.isSelfClosing else {
-            return .complete(Payload(name: function.name, parameters: [], end: index))
-        }
+        // `<function name="f"/>` is not the template's spelling (`<function name="f"></function>`
+        // is) and carries no `</function>` for the streaming framer to wait for.
+        guard !function.name.isEmpty, !function.isSelfClosing else { return .malformed }
 
         var parameters: [(name: String, value: String)] = []
         while true {
