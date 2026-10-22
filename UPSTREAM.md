@@ -18,7 +18,14 @@ Each topic is based on the base commit above. Applies to `ml-explore/mlx-swift-l
 
 <!-- topic/minicpm5-tool-call-format -->
 
-<!-- topic/declared-tools-authoritative -->
+### `topic/declared-tools-authoritative`
+
+| Upstream PR | Status |
+|---|---|
+| none yet | not-submitted (no upstream contact before the quantbench + agentbench soak, ADR-0008); tracked in eejd/swift-lm#9. `git apply --check` passes against `ml-explore/mlx-swift-lm` `main` (`bb0d5b0`) for every file but `Evaluate.swift` (its draft-model `generate` is SharpAI's); not built there |
+
+With `tools: []` (a request that offers no tools) JSON without a protocol marker is response text, not a call to an undeclared function that is rejected and dropped (a Llama 3 format model answering `{"name": "Jane Doe", "age": 31}`); marked attempts are still rejected, `nil` and a nonempty list behave as before. The draft-model `generate` accepted `tools:` and dropped it and the tool-call policy.
+
 
 ## Origin
 
