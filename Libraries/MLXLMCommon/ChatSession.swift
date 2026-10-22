@@ -381,8 +381,9 @@ public final class ChatSession {
     /// Optional automatic dispatcher for accepted tool calls.
     ///
     /// Automatic dispatch is fail-closed: only calls naming a function declared
-    /// in ``tools`` can reach this callback. If `tools` is `nil` or empty, every
-    /// tool-call-shaped model output is rejected without invoking the callback.
+    /// in ``tools`` can reach this callback. If `tools` is `nil` or empty, a marked
+    /// tool-call attempt is rejected without invoking the callback, and unmarked JSON is
+    /// response text.
     public var toolDispatch: (@Sendable (ToolCall) async throws -> String)?
 
     /// Speculative decoding configuration, nil if disabled.

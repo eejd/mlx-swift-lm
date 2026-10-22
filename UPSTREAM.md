@@ -25,7 +25,14 @@ Each topic is based on the base commit above. Applies to `ml-explore/mlx-swift-l
 MiniCPM5 (`model_type` `llama`, vocabulary 130560) was given the Llama 3 format by the architecture heuristic and its `<function name="f"><param name="k">v</param></function>` calls stayed response text. Adds `ToolCallFormat.minicpm5` and `MiniCPM5ToolCallParser` (CDATA values, parallel calls, schema-typed arguments, markup tolerated without CDATA), selects it from the chat template or `tool_parser_type: minicpm5`, and adds `ToolCallParser.frameEnd(in:)` so the streaming processor and the recovery scanner agree on where a call whose value may contain its own close tag ends.
 
 
-<!-- topic/declared-tools-authoritative -->
+### `topic/declared-tools-authoritative`
+
+| Upstream PR | Status |
+|---|---|
+| none yet | not-submitted (no upstream contact before the quantbench + agentbench soak, ADR-0008); tracked in eejd/swift-lm#9. `git apply --check` passes against `ml-explore/mlx-swift-lm` `main` (`bb0d5b0`) for every file but `Evaluate.swift` (its draft-model `generate` is SharpAI's); not built there |
+
+With `tools: []` (a request that offers no tools) JSON without a protocol marker is response text, not a call to an undeclared function that is rejected and dropped (a Llama 3 format model answering `{"name": "Jane Doe", "age": 31}`); marked attempts are still rejected, `nil` and a nonempty list behave as before. The draft-model `generate` accepted `tools:` and dropped it and the tool-call policy.
+
 
 ## Origin
 

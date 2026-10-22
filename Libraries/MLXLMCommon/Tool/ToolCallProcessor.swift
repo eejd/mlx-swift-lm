@@ -97,6 +97,11 @@ public class ToolCallProcessor {
     ///     an empty one, authorizes only the names it declares.
     ///     A nonempty declaration also enables bounded cross-dialect recovery;
     ///     only an exactly declared function name can be promoted by recovery.
+    ///     An empty array means the request offers no tools: JSON without a
+    ///     protocol marker (a bare object, however much it looks like a call) is
+    ///     then response text, and only a marked attempt is rejected as
+    ///     undeclared. A request that offers no tools therefore passes `[]`,
+    ///     not `nil`.
     ///   - toolCallPolicy: Recovery and validation rules. Defaults to conservative
     ///     recovery and permissive schema validation; tool-name authorization always applies.
     public init(
@@ -415,7 +420,9 @@ public class ToolCallProcessor {
                     hasExplicitInlineMarker || leading.contains("<|python_tag|>")
                 let visibleLeading = cleanInlineLeading(leading)
 
-                if let toolCall = parser.parse(content: toolCallBuffer, tools: tools) {
+                if hasExplicitInlineMarker || !offersNoTools,
+                    let toolCall = parser.parse(content: toolCallBuffer, tools: tools)
+                {
                     recordResponse(visibleLeading)
                     appendToolCall(toolCall, rawText: leading + toolCallBuffer)
                     toolCallBuffer = ""
@@ -458,7 +465,9 @@ public class ToolCallProcessor {
                 return nil
             }
 
-            if let toolCall = parser.parse(content: toolCallBuffer, tools: tools) {
+            if hasExplicitInlineMarker || !offersNoTools,
+                let toolCall = parser.parse(content: toolCallBuffer, tools: tools)
+            {
                 appendToolCall(toolCall, rawText: toolCallBuffer)
                 toolCallBuffer = ""
                 state = .normal
@@ -965,7 +974,9 @@ public class ToolCallProcessor {
         let trailingToken = split.trailing
         recordResponse(leadingToken ?? "")
 
-        if let toolCall = parser.parse(content: jsonCandidate, tools: tools) {
+        if !offersNoTools,
+            let toolCall = parser.parse(content: jsonCandidate, tools: tools)
+        {
             appendToolCall(toolCall, rawText: jsonCandidate)
 
             state = .normal
@@ -1119,7 +1130,7 @@ public class ToolCallProcessor {
                 ? .incompleteOutput : .malformedSyntax
         case .collectingToolCall:
             if isInlineFormat {
-                guard explicitInlineMarker || inspectJSONToolIntent(text) != nil else {
+                guard explicitInlineMarker || bareJSONToolIntent(text) != nil else {
                     return nil
                 }
                 if jsonObjectScanner.splitLeadingObject(from: text) == nil {
@@ -1132,7 +1143,7 @@ public class ToolCallProcessor {
             }
             return .incompleteOutput
         case .collectingJSONToolCall:
-            guard inspectJSONToolIntent(text) != nil else { return nil }
+            guard bareJSONToolIntent(text) != nil else { return nil }
             if jsonObjectScanner.splitLeadingObject(from: text) == nil {
                 return .incompleteOutput
             }
@@ -1156,7 +1167,7 @@ public class ToolCallProcessor {
     private func rejectInlinePayloadIfNeeded(
         _ text: String, explicitMarker: Bool
     ) -> Bool {
-        guard explicitMarker || inspectJSONToolIntent(text) != nil else { return false }
+        guard explicitMarker || bareJSONToolIntent(text) != nil else { return false }
         let inspection = inspectJSONToolIntent(text)
         let reason = inspection?.reason ?? classifyCompletePayload(text)
         appendRejectedToolCall(
@@ -1169,7 +1180,7 @@ public class ToolCallProcessor {
     }
 
     private func rejectBareJSONPayloadIfNeeded(_ text: String) -> Bool {
-        guard let inspection = inspectJSONToolIntent(text) else { return false }
+        guard let inspection = bareJSONToolIntent(text) else { return false }
         appendRejectedToolCall(
             reason: inspection.reason,
             rawText: text,
@@ -1177,6 +1188,22 @@ public class ToolCallProcessor {
             callID: inspection.callID,
             detail: inspection.reason.diagnosticDetail)
         return true
+    }
+
+    /// Whether this processor was given an empty tool list: the request offers no tools, so
+    /// there is nothing an unmarked JSON object could be calling.
+    ///
+    /// An ordinary JSON answer is shaped like a call whenever it has a `name` key
+    /// (`{"name": "Jane", "age": 31}`), so it is response text then. A marked attempt
+    /// (`<tool_call>`, `<|python_tag|>`) is still rejected as undeclared.
+    private var offersNoTools: Bool {
+        allowedToolNames?.isEmpty == true
+    }
+
+    /// The tool intent of JSON that carries no protocol marker: none when no tool is offered
+    /// (see ``offersNoTools``).
+    private func bareJSONToolIntent(_ text: String) -> JSONToolIntent? {
+        offersNoTools ? nil : inspectJSONToolIntent(text)
     }
 
     private func classifyCompletePayload(_ text: String) -> RejectedToolCall.Reason {
