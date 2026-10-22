@@ -42,11 +42,25 @@ public protocol ToolCallParser: Sendable {
     /// The default implementation splits on `startTag` (if present) and parses
     /// each segment individually.
     func parseEOS(_ toolCallBuffer: String, tools: [[String: any Sendable]]?) -> [ToolCall]
+
+    /// The index just past the end of the framed call that begins `buffer`, or
+    /// `nil` when the buffer does not yet hold a complete frame.
+    ///
+    /// `ToolCallProcessor` and the cross-dialect recovery scanner call this
+    /// once the end tag may have arrived. The default is the first textual
+    /// `endTag`; a dialect whose payload can legitimately contain its own end
+    /// tag (an escaped or quoted parameter value) overrides it so that both
+    /// components agree on where a call ends.
+    func frameEnd(in buffer: String) -> String.Index?
 }
 
 extension ToolCallParser {
     public var supportsBareJSON: Bool { false }
     public var supportsMarkerlessNamedJSON: Bool { false }
+
+    public func frameEnd(in buffer: String) -> String.Index? {
+        endTag.flatMap { buffer.range(of: $0)?.upperBound }
+    }
 
     public func parseEOS(_ toolCallBuffer: String, tools: [[String: any Sendable]]?) -> [ToolCall] {
         if let startTag {
@@ -129,6 +143,12 @@ public enum ToolCallFormat: String, Hashable, Sendable, Codable, CaseIterable {
     /// Example: `<|python_tag|>{ "name": "func", "parameters": {...} }`
     case llama3
 
+    /// MiniCPM5's function format: attribute-quoted `<function>` blocks with
+    /// no outer wrapper; parallel calls are consecutive blocks, and a parameter
+    /// value containing `<`, `&` or a newline is wrapped in CDATA.
+    /// Example: `<function name="f"><param name="k">v</param></function>`
+    case minicpm5
+
     /// GPT-OSS full Harmony response protocol.
     ///
     /// Not a tool-call JSON dialect: selects the Harmony frame parser + router
@@ -166,6 +186,8 @@ public enum ToolCallFormat: String, Hashable, Sendable, Codable, CaseIterable {
             return KimiK2ToolCallParser()
         case .minimaxM2:
             return MiniMaxM2ToolCallParser()
+        case .minicpm5:
+            return MiniCPM5ToolCallParser()
         case .atem:
             return ATEMToolCallParser()
         case .mistral:
@@ -221,7 +243,7 @@ public enum ToolCallFormat: String, Hashable, Sendable, Codable, CaseIterable {
                 toolCallPolicy: toolCallPolicy)
 
         case .json, .lfm2, .xmlFunction, .qwen35, .glm4, .gemma, .gemma4, .kimiK2, .minimaxM2,
-            .mistral, .llama3:
+            .minicpm5, .mistral, .llama3:
             return nil
         }
     }
@@ -243,8 +265,7 @@ public enum ToolCallFormat: String, Hashable, Sendable, Codable, CaseIterable {
         case .atem:
             return OnyxToolRestartRule(tokenizer: tokenizer).map { [$0] } ?? []
         case .json, .lfm2, .xmlFunction, .qwen35, .glm4, .gemma, .gemma4, .kimiK2, .minimaxM2,
-            .mistral,
-            .llama3:
+            .minicpm5, .mistral, .llama3:
             return []
         }
     }
@@ -265,7 +286,7 @@ public enum ToolCallFormat: String, Hashable, Sendable, Codable, CaseIterable {
                 }
             }
         case .json, .lfm2, .xmlFunction, .qwen35, .glm4, .gemma, .gemma4, .kimiK2, .minimaxM2,
-            .mistral, .llama3:
+            .minicpm5, .mistral, .llama3:
             0
         }
     }

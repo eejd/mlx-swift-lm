@@ -45,6 +45,7 @@ extension ToolCallFormat {
         Signature(
             .xmlFunction, anyOf: [["<tool_call>\n<function="], [#"<tool_call>\n<function="#]]),
         Signature(.kimiK2, allOf: "<|tool_calls_section_begin|>"),
+        Signature(.minicpm5, allOf: #"<function name=""#, #"<param name=""#),
         Signature(.mistral, allOf: "[TOOL_CALLS]"),
         Signature(.json, allOf: "<tool_call>", "tool_call.name"),
     ]
@@ -70,6 +71,7 @@ extension ToolCallFormat {
         case "pythonic", "lfm2": self = .lfm2
         case "qwen3_coder", "qwen3_xml", "xml_function": self = .xmlFunction
         case "kimi_k2": self = .kimiK2
+        case "minicpm5": self = .minicpm5
         case "mistral": self = .mistral
         case "json_tools", "json": self = .json
         default: return nil
