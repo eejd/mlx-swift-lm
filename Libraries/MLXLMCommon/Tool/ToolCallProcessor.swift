@@ -791,11 +791,13 @@ public class ToolCallProcessor {
             // `<tool_call>` frames close only after a structurally complete
             // payload, so a literal close marker inside a JSON string argument
             // cannot truncate the frame and expose its suffix as new input.
-            // Other dialects keep the first textual close their parsers use.
+            // Other dialects close where their parser says the frame ends: by
+            // default the first textual close, for a dialect with escaped
+            // values the structural one.
             let frameEnd =
                 usesStructuralToolCallFrame
                 ? ToolCallFrameScanner.frameEnd(in: toolCallBuffer)
-                : toolCallBuffer.range(of: endTag).map(\.upperBound)
+                : parser.frameEnd(in: toolCallBuffer)
 
             if let frameEnd {
                 let bufferedToolCall = String(toolCallBuffer[..<frameEnd])

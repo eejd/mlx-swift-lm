@@ -112,6 +112,7 @@ struct TextToolCallRecoveryScanner: Sendable {
     private let supportsBareJSON: Bool
     private var jsonPrefixScanner = JSONPrefixScanner()
     private let primaryFormat: ToolCallFormat
+    private let primaryParser: any ToolCallParser
     private let policy: ToolCallRecoveryPolicy
     private let tools: [[String: any Sendable]]
     private let allowedToolNames: Set<String>
@@ -166,6 +167,7 @@ struct TextToolCallRecoveryScanner: Sendable {
         self.maximumBufferedByteCount = maximumBufferedByteCount
 
         let primaryParser = primaryFormat.createParser()
+        self.primaryParser = primaryParser
         self.supportsBareJSON = primaryParser.supportsBareJSON
         self.namedJSONScanner =
             primaryParser.supportsMarkerlessNamedJSON
@@ -366,7 +368,7 @@ struct TextToolCallRecoveryScanner: Sendable {
                     ? nil
                     : endMarker == ToolCallFrameScanner.endTag
                         ? ToolCallFrameScanner.frameEnd(in: buffer)
-                        : buffer.range(of: endMarker).map(\.upperBound)
+                        : primaryParser.frameEnd(in: buffer)
                 if let frameEnd {
                     let raw = String(buffer[..<frameEnd])
                     buffer = String(buffer[frameEnd...])

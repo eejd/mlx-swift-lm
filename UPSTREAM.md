@@ -16,7 +16,14 @@ Primary upstream: `ml-explore/mlx-swift-lm` (GitHub fork parent). Secondary upst
 
 Each topic is based on the base commit above. Applies to `ml-explore/mlx-swift-lm` `main` means `git apply --check` of the topic's diff against the commit named; it was not built there.
 
-<!-- topic/minicpm5-tool-call-format -->
+### `topic/minicpm5-tool-call-format`
+
+| Upstream PR | Status |
+|---|---|
+| none yet | not-submitted (no upstream contact before the quantbench + agentbench soak, ADR-0008); tracked in eejd/swift-lm#8. `git apply --check` passes against `ml-explore/mlx-swift-lm` `main` (`bb0d5b0`); it was not built there |
+
+MiniCPM5 (`model_type` `llama`, vocabulary 130560) was given the Llama 3 format by the architecture heuristic and its `<function name="f"><param name="k">v</param></function>` calls stayed response text. Adds `ToolCallFormat.minicpm5` and `MiniCPM5ToolCallParser` (CDATA values, parallel calls, schema-typed arguments, markup tolerated without CDATA), selects it from the chat template or `tool_parser_type: minicpm5`, and adds `ToolCallParser.frameEnd(in:)` so the streaming processor and the recovery scanner agree on where a call whose value may contain its own close tag ends.
+
 
 <!-- topic/declared-tools-authoritative -->
 
